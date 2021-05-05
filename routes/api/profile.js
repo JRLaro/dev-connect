@@ -121,7 +121,7 @@ router.get("/", async (req, res) => {
 router.get("/user/:user_id", async (req, res) => {
   try {
     const profile = await Profile.findOne({
-      user: req.params.user_id
+      user: req.params.user_id,
     }).populate("user", ["name", "avatar"]);
 
     if (!profile) {
@@ -130,11 +130,82 @@ router.get("/user/:user_id", async (req, res) => {
     res.json(profile);
   } catch (err) {
     console.error(err.message);
-    if (err.kind == 'ObjectId') {
+    if (err.kind == "ObjectId") {
       return res.status(400).json({ msg: "Profile not found" });
     }
     res.status(500).send("Server Error");
   }
 });
+
+//delete profile
+router.delete("/", auth, async (req, res) => {
+  try {
+    //@todo --> remove user post
+
+    //remove profile
+    await Profile.findOneAndRemove({ user: req.user.id });
+
+    //remove user
+    await User.findOneAndRemove({ _id: req.user.id });
+
+    res.json({ msg: "User has been deleted" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
+});
+
+//put --> add profile experience
+router.put(
+  "/experience",
+  [
+    auth,
+    [
+      body("title", "Title is required").not().isEmpty(),
+      body("company", "Company is required").not().isEmpty(),
+      body("from", "From date is required").not().isEmpty(),
+    ],
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    const {
+      title,
+      company,
+      location,
+      from,
+      to,
+      current,
+      description,
+    } = req.body;
+
+    const newExp = {
+      title,
+      company,
+      location,
+      from,
+      to,
+      current,
+      description,
+    };
+
+    try {
+      const profile = await Profile.findOne({ user: req.user.id });
+      profile.experience.unshift(newExp);
+
+      await profile.save();
+
+      res.json(profile);
+    } catch (err) {
+      console.error(err.message);
+      if (err.kind == "ObjectId") {
+        return res.status(400).json({ msg: "Profile not found" });
+      }
+      res.status(500).send("Server Error");
+    }
+  }
+);
 
 module.exports = router;
